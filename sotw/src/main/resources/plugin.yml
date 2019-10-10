@@ -1,0 +1,6 @@
+name: 'MCWarsSOTW'
+main: 'dev.lockedthread.mcwars.sotw.MCWarsSOTW'
+version: '1.0-SNAPSHOT'
+author: 'LockedThread#5691'
+website: 'www.lockedthread.dev'
+depend: ['GSGCore']

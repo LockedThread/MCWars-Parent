@@ -1,0 +1,34 @@
+sotw:
+  # This value is changed by /sotw in game, this is the serialized value.
+  enabled: false
+  cooldowned-commands:
+    island:
+      # This will search for the command and find all of it's aliases so it will also block those, this will also block the pluginname:command shortcuts automatically.
+      use-bukkit-commandmap: false
+      # This will check for String#startsWith instead of String#equalsIgnoreCase
+      starts-with: false
+      command-name: 'island'
+      cooldown-time:
+        donator:
+          enabled: true
+          permission: 'some.donator.permission.use'
+          # Time in milliseconds
+          time:
+            ranged:
+              enabled: false
+              min: 0
+              max: 0
+            # The time doesn't change at all. Set static to 0 if you don't want to use it, although the ranged time must be above 0 or there will be no delay.
+            static: 60000
+        regular:
+          time:
+            # Ranged time where it will be random at the time of joining
+            ranged:
+              enabled: true
+              min: 60000
+              max: 120000
+            static: 0
+      # Aliases to look for. Will also be added to the bukkit command alias list if the option is enabled and found.
+      aliases:
+        - 'islands'
+        - 'is'
