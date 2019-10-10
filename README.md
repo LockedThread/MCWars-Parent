@@ -1,1 +1,1 @@
-# MCWarsSOTW
+# MCWars
