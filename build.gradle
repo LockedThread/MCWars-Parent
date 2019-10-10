@@ -1,0 +1,11 @@
+group 'dev.lockedthread.mcwars'
+version '1.0-SNAPSHOT'
+
+allprojects {
+    project.group 'dev.lockedthread.mcwars'
+    project.version '1.0-SNAPSHOT'
+    if (project != this) {
+        project.plugins.apply('java')
+        project.sourceCompatibility = 1.8
+    }
+}

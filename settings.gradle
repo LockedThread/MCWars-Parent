@@ -1,0 +1,5 @@
+rootProject.name = 'parent'
+include 'sotw'
+include 'sotw'
+include 'sotw'
+
