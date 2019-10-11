@@ -9,4 +9,6 @@ dependencies {
     implementation(group: 'net.techcable.tacospigot', name: 'server', version: '1.8.8-R0.2-SNAPSHOT') {
         exclude group: 'it.unimi.dsi', module: 'fastutil'
     }
+    compileOnly 'org.projectlombok:lombok:1.18.10'
+	annotationProcessor 'org.projectlombok:lombok:1.18.10'
 }
