@@ -11,6 +11,7 @@ sotw:
         - 'island'
         - 'islands'
         - 'is'
+      in-cooldown-message: '&cUnable to execute {command} because youre on cooldown for another {time} seconds'
       cooldown-time:
         donator:
           enabled: true
