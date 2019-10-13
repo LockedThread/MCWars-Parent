@@ -1,34 +1,37 @@
 package dev.lockedthread.mcwars.sotw.units;
 
+import com.gameservergroup.gsgcore.collections.ConcurrentHashSet;
 import com.gameservergroup.gsgcore.commands.post.CommandPost;
 import com.gameservergroup.gsgcore.events.EventPost;
 import com.gameservergroup.gsgcore.units.Unit;
 import com.gameservergroup.gsgcore.utils.CallBack;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Lists;
 import dev.lockedthread.mcwars.sotw.MCWarsSOTW;
+import dev.lockedthread.mcwars.sotw.objs.CachedCooldown;
 import dev.lockedthread.mcwars.sotw.objs.Cooldown;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
-import org.bukkit.metadata.FixedMetadataValue;
-import org.bukkit.metadata.MetadataValue;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 public class UnitSOTW extends Unit {
 
     private boolean sotw = false;
     private static final MCWarsSOTW INSTANCE = MCWarsSOTW.getInstance();
-    private Map<String, Cooldown> cooldownMap;
+    private ImmutableMap<String, Cooldown> cooldownMap;
+    private Map<UUID, CachedCooldown> cachedCooldowns;
 
     @Override
     public void setup() {
+        this.cachedCooldowns = new HashMap<>();
+        this.sotw = INSTANCE.getConfig().getBoolean("sotw.enabled");
         //noinspection rawtypes
         hookDisable(new CallBack() {
             @Override
@@ -38,7 +41,7 @@ public class UnitSOTW extends Unit {
             }
         });
 
-        ConfigurationSection section = INSTANCE.getConfig().getConfigurationSection("cooldowned-commands");
+        ConfigurationSection section = INSTANCE.getConfig().getConfigurationSection("sotw.cooldowned-commands");
         Map<String, Cooldown> map = section.getKeys(false)
                 .stream()
                 .collect(Collectors.toMap(key -> key, key -> new Cooldown(section.getConfigurationSection(key)), (a, b) -> b));
@@ -75,63 +78,68 @@ public class UnitSOTW extends Unit {
 
         EventPost.of(PlayerJoinEvent.class)
                 .filter(event -> sotw)
-                .handle(event -> setCooldowns(event.getPlayer(), new ArrayList<>(cooldownMap.keySet())))
+                .handle(event -> setCooldowns(event.getPlayer(), new CachedCooldown(System.currentTimeMillis(), new ConcurrentHashSet<>(cooldownMap.keySet()))))
                 .post(INSTANCE);
 
         EventPost.of(PlayerQuitEvent.class)
                 .filter(event -> sotw)
                 .handle(event -> {
-
+                    Player player = event.getPlayer();
+                    CachedCooldown cooldownList = cachedCooldowns.get(player.getUniqueId());
+                    if (cooldownList == null) {
+                        throw new RuntimeException("Somehow there are no instances of cooldown metadata for player: " + player.getName() + " contact LockedThread immediately.");
+                    } else {
+                        cooldownList.getCooldownStrings().forEach(cooldown -> cooldownMap.remove(cooldown).getCachedTimes().remove(player));
+                    }
                 }).post(INSTANCE);
 
-        EventPost.of(PlayerCommandPreprocessEvent.class)
-                .filter(event -> event.getPlayer().hasMetadata("cooldowns"))
+        EventPost.of(PlayerCommandPreprocessEvent.class, EventPriority.LOWEST)
+                .filter(event -> sotw)
                 .handle(event -> {
                     Player player = event.getPlayer();
-                    List<MetadataValue> metadataValues = player.getMetadata("cooldowns");
-                    if (metadataValues.size() == 0) {
+                    CachedCooldown cachedCooldown = cachedCooldowns.get(player.getUniqueId());
+                    if (cachedCooldown == null) {
                         throw new RuntimeException("Somehow there are no instances of cooldown metadata for player: " + player.getName() + " contact LockedThread immediately.");
-                    } else if (metadataValues.size() == 1) {
-                        MetadataValue metadataValue = metadataValues.get(0);
-                        List<String> cooldowns = (List<String>) metadataValue.value();
-                        for (String cooldownString : cooldowns) {
+                    } else {
+                        for (String cooldownString : cachedCooldown.getCooldownStrings()) {
                             Cooldown cooldown = cooldownMap.get(cooldownString);
-                            Long time = cooldown.getCachedTimes().get(player);
-                            if (time == null || time == 0) {
-                                time = cooldown.getCooldownTime().getTime(player);
-                                cooldown.getCachedTimes().put(player, cooldown.getCooldownTime().getTime(player));
-                            }
-                            long lastPlayed = player.getLastPlayed();
-                            if (lastPlayed + time >= System.currentTimeMillis()) {
-                                cooldown.sendCooldownMessage(player, event.getMessage(), (time / 1000));
+                            boolean pass;
+                            if (cooldown.isStartsWith()) {
+                                pass = event.getMessage().toLowerCase().startsWith("/" + cooldownString);
                             } else {
-                                cooldown.getCachedTimes().remove(player);
-                                cooldowns.remove(cooldownString);
+                                pass = event.getMessage().equalsIgnoreCase("/" + cooldownString);
+                            }
+                            System.out.println("pass = " + pass);
+                            System.out.println("cooldown = " + cooldown);
+                            if (pass) {
+                                Long time = cooldown.getCachedTimes().get(player);
+                                System.out.println("time = " + time);
+                                if (time == null) {
+                                    System.out.println("time == null");
+                                    time = cooldown.getCooldownTime().getTime(player);
+                                    cooldown.getCachedTimes().put(player, cooldown.getCooldownTime().getTime(player));
+                                }
+                                System.out.println("time == null, now time = " + time);
+                                long timeJoined = cachedCooldown.getTimeJoined();
+                                System.out.println("timeJoined = " + timeJoined);
+                                if (timeJoined + time >= System.currentTimeMillis()) {
+                                    long theCalculatedTime = Math.abs((System.currentTimeMillis() - timeJoined - time) / 1000);
+                                    //long seconds = time / 1000;
+                                    cooldown.sendCooldownMessage(player, event.getMessage(), theCalculatedTime);
+                                    System.out.println("send cooldown message");
+                                    event.setCancelled(true);
+                                } else {
+                                    System.out.println("removed cached and removed cooldown from player meta");
+                                    cooldown.getCachedTimes().remove(player);
+                                    cachedCooldown.getCooldownStrings().remove(cooldownString);
+                                }
                             }
                         }
                     }
                 }).post(INSTANCE);
-
     }
 
-    public void setCooldowns(Player player, List<String> cooldowns) {
-        player.setMetadata("cooldowns", new FixedMetadataValue(INSTANCE, cooldowns));
-    }
-
-    public void addCooldown(Player player, String cooldownName) {
-        List<String> cooldowns;
-        if (player.hasMetadata("cooldowns")) {
-            List<MetadataValue> metadataValues = player.getMetadata("cooldowns");
-            if (metadataValues.size() == 0) {
-                cooldowns = Lists.newArrayList(cooldownName);
-            } else if (metadataValues.size() == 1) {
-                cooldowns = (List<String>) metadataValues.get(0).value();
-            } else {
-                throw new RuntimeException("Somehow there are more than one instance of cooldown metadata for player: " + player.getName() + " contact LockedThread immediately.");
-            }
-        } else {
-            cooldowns = Lists.newArrayList(cooldownName);
-        }
-        setCooldowns(player, cooldowns);
+    public void setCooldowns(Player player, CachedCooldown cachedCooldown) {
+        this.cachedCooldowns.put(player.getUniqueId(), cachedCooldown);
     }
 }

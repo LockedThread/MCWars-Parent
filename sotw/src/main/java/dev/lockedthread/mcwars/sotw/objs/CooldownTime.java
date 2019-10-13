@@ -50,7 +50,7 @@ public class CooldownTime {
             System.out.println("randomNumber = " + randomNumber);
             return randomNumber;
         }
-        long staticLong = section.getLong("static");
+        long staticLong = timeValues.getLong("static");
         System.out.println("staticLong = " + staticLong);
         return staticLong;
     }
