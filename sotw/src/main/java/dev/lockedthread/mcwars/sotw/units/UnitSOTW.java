@@ -69,6 +69,8 @@ public class UnitSOTW extends Unit {
                                     c.reply("&cUnable to parse arg 0 " + c.getRawArg(0) + " as boolean (on/off)");
                                     return;
                             }
+                            sotw = toggle;
+                            c.reply(sotw ? "&aYou have enabled SOTW cooldowns" : "&cYou have disabled SOTW cooldowns");
                             break;
                         default:
                             c.reply("&cUnable to parse command. /sotw {on/off}");
